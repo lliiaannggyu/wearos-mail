@@ -1,0 +1,56 @@
+package com.workbuddy.wearosmail.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.CompactChip
+import androidx.wear.compose.material.ListHeader
+import androidx.wear.compose.material.Text
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import com.workbuddy.wearosmail.MailViewModel
+import com.workbuddy.wearosmail.mail.MailFilter
+
+@Composable
+fun SearchScreen(vm: MailViewModel, nav: NavHostController) {
+    val listState = rememberScalingLazyListState()
+    val query by vm.query.collectAsState()
+    val results by vm.visibleEmails.collectAsState()
+
+    LaunchedEffect(Unit) { vm.setFilter(MailFilter.ALL) }
+
+    WearScreen(listState) {
+        item { ListHeader { Text("搜索") } }
+        item { RoundTextField(query, { vm.setQuery(it) }, "发件人 / 主题 / 正文") }
+
+        if (query.isBlank()) {
+            item { Hint("在已拉取的邮件中查找（本地过滤）") }
+        } else if (results.isEmpty()) {
+            item { Hint("没有匹配的邮件") }
+        } else {
+            results.forEach { e ->
+                item {
+                    Chip(
+                        label = { Text(e.displayFrom, maxLines = 1) },
+                        secondaryLabel = { Text(e.subject.ifBlank { "(无主题)" }, maxLines = 1) },
+                        onClick = {
+                            vm.open(e.uid)
+                            nav.navigate("detail/${e.uid}")
+                        },
+                        modifier = Modifier.fillParentMaxWidth(),
+                    )
+                }
+            }
+        }
+
+        item {
+            CompactChip(
+                onClick = { vm.setQuery(""); nav.popBackStack() },
+                label = { Text("返回") },
+            )
+        }
+    }
+}

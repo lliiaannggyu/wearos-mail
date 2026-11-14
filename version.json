@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "apk": "https://github.com/lliiaannggyu/wearos-mail/releases/download/v1.0.0/wearos-mail-v1.0.0.apk",
+  "size": 1477760,
+  "note": "Wear OS 原生版更新清单。GitHub API 限流时应用会回退读取本文件（raw 域名无 API 限流）。发版时必须与 app/build.gradle.kts 的 versionName 同步。"
+}
