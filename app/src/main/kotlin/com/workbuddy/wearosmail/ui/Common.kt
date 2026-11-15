@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Chip
@@ -38,37 +40,52 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import com.workbuddy.wearosmail.DeviceSupport
 
 /**
+ * 当前主题色阶：由设置页的「自定义种子色」驱动。
+ *
+ * 用 staticCompositionLocalOf 是为了让种子色变化时整个界面（TimeText / 进度环 /
+ * 所有功能按钮）一起重组换色，而不需要在每个调用点手动传参。
+ */
+val LocalMailPalette = staticCompositionLocalOf { MailPalette.DEFAULT }
+
+/**
  * 全局低饱和暗色主题。
  *
  * 用 [MailPalette] 的官方色阶（tone≈30 暗容器 / tone≈92 柔和浅字）替换 Wear
  * MaterialTheme 默认的高饱和亮色 primary，让所有系统组件（TimeText / 进度环 /
- * 页面指示点 / 文本）都不再是刺眼的亮紫色。
+ * 页面指示点 / 文本）都不再是刺眼的亮紫色。primary 系列跟随用户自定义种子色。
  */
 @Composable
-fun WearMailColors(): Colors = Colors(
-    primary = Color(MailPalette.container(ChipKind.MAIL)),
-    primaryVariant = Color(MailPalette.tone(ChipKind.MAIL, 20)),
-    secondary = Color(MailPalette.container(ChipKind.SEARCH)),
-    secondaryVariant = Color(MailPalette.tone(ChipKind.SEARCH, 20)),
-    background = Color(MailPalette.BACKGROUND),
-    surface = Color(MailPalette.SURFACE),
-    error = Color(MailPalette.container(ChipKind.DANGER)),
-    onPrimary = Color(MailPalette.onContainer(ChipKind.MAIL)),
-    onSecondary = Color(MailPalette.onContainer(ChipKind.SEARCH)),
-    onBackground = Color(MailPalette.ON_SURFACE),
-    onSurface = Color(MailPalette.ON_SURFACE),
-    onSurfaceVariant = Color(MailPalette.ON_SURFACE_MUTED),
-    onError = Color(MailPalette.onContainer(ChipKind.DANGER)),
-)
+fun WearMailColors(): Colors {
+    val palette = LocalMailPalette.current
+    return Colors(
+        primary = Color(palette.containerFor(ChipKind.MAIL)),
+        primaryVariant = Color(palette.toneFor(ChipKind.MAIL, 20)),
+        secondary = Color(palette.containerFor(ChipKind.SEARCH)),
+        secondaryVariant = Color(palette.toneFor(ChipKind.SEARCH, 20)),
+        background = Color(MailPalette.BACKGROUND),
+        surface = Color(MailPalette.SURFACE),
+        error = Color(palette.containerFor(ChipKind.DANGER)),
+        onPrimary = Color(palette.onContainerFor(ChipKind.MAIL)),
+        onSecondary = Color(palette.onContainerFor(ChipKind.SEARCH)),
+        onBackground = Color(MailPalette.ON_SURFACE),
+        onSurface = Color(MailPalette.ON_SURFACE),
+        onSurfaceVariant = Color(MailPalette.ON_SURFACE_MUTED),
+        onError = Color(palette.onContainerFor(ChipKind.DANGER)),
+    )
+}
 
 /** 按功能分类生成按钮配色：暗、淡、低饱和，且不同功能色相分离。 */
 @Composable
-fun chipColors(kind: ChipKind): ChipColors = ChipDefaults.primaryChipColors(
-    backgroundColor = Color(MailPalette.container(kind)),
-    contentColor = Color(MailPalette.onContainer(kind)),
-    secondaryContentColor = Color(MailPalette.onContainer(kind)).copy(alpha = 0.72f),
-    iconColor = Color(MailPalette.onContainer(kind)),
-)
+fun chipColors(kind: ChipKind): ChipColors {
+    val palette = LocalMailPalette.current
+    val content = Color(palette.onContainerFor(kind))
+    return ChipDefaults.primaryChipColors(
+        backgroundColor = Color(palette.containerFor(kind)),
+        contentColor = content,
+        secondaryContentColor = content.copy(alpha = 0.72f),
+        iconColor = content,
+    )
+}
 
 /** 统一按钮：所有页面共用这一个组件，宽度由调用方在列表 item 里统一给满宽。 */
 @Composable
@@ -111,7 +128,7 @@ fun ScalingLazyListScope.actionChip(
 }
 
 /**
- * 「写邮件 + 搜索」合并行：两个对半相等、等宽等高的按钮。
+ * 「写邮件 + 搜索」合并行：两个对半相等、等宽等高的按钮，文字各自水平居中。
  * 写邮件用 COMPOSE 色、搜索用 SEARCH 色，功能颜色彼此分开。
  */
 @Composable
@@ -128,14 +145,28 @@ fun SplitActionRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Chip(
-            label = { Text(leftLabel, maxLines = 1) },
+            label = {
+                Text(
+                    leftLabel,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
             onClick = onLeft,
             colors = chipColors(ChipKind.COMPOSE),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
             modifier = Modifier.weight(1f),
         )
         Chip(
-            label = { Text(rightLabel, maxLines = 1) },
+            label = {
+                Text(
+                    rightLabel,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
             onClick = onRight,
             colors = chipColors(ChipKind.SEARCH),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),

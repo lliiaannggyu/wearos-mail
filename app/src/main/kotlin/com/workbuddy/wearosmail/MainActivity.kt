@@ -70,7 +70,10 @@ class MainActivity : ComponentActivity() {
                 factory = object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
                     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                        MailViewModel(AccountStore(applicationContext)) as T
+                        MailViewModel(
+                            AccountStore(applicationContext),
+                            ThemeStore(applicationContext),
+                        ) as T
                 }
             )
             WearMailApp(ambient = ambientState.value, vm = vm)

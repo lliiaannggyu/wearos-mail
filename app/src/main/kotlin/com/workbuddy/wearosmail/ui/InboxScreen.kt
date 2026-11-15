@@ -40,9 +40,11 @@ private val INBOX_PAGES = listOf(
  * 收件箱：Scaffold（TimeText/Vignette）+ 官方 HorizontalPager 三页 +
  * Wear 官方 HorizontalPageIndicator 页面指示点。
  *
- * 这是 Wear OS 官方推荐的「左右滑动切换页面」组合。真手表上 pager 用官方
- * edgeSwipeToDismiss 与 SwipeDismissableNavHost 的右滑返回协调：屏幕边缘的
- * 右滑交给返回手势，其余区域的左右滑交给分页。
+ * 「写邮件 + 搜索」只在第一页（全部邮件）顶部出现，其余两页不显示；
+ * 列表底部每页都有统一的「设置」入口（关于 / 更新 / 账号切换 / 主题）。
+ *
+ * 真手表上 pager 用官方 edgeSwipeToDismiss 与 SwipeDismissableNavHost 的
+ * 右滑返回协调：屏幕边缘的右滑交给返回手势，其余区域的左右滑交给分页。
  */
 @Composable
 fun InboxScreen(
@@ -92,6 +94,7 @@ fun InboxScreen(
                         vm = vm,
                         nav = nav,
                         title = title,
+                        showComposeSearch = filter == MailFilter.ALL,
                         pageEmails = pageEmails,
                         total = allEmails.size,
                         unread = unread,
@@ -113,11 +116,12 @@ private class InboxPageIndicatorState(private val pagerState: PagerState) : Page
     override val pageOffset: Float get() = pagerState.currentPageOffsetFraction
 }
 
-/** 单页列表内容：标题 + 账号信息 + 邮件列表 + 统一宽度的操作按钮。 */
+/** 单页列表内容：标题 →（仅全部页）顶部操作行 → 邮件列表 → 底部设置。 */
 private fun ScalingLazyListScope.inboxPageContent(
     vm: MailViewModel,
     nav: NavHostController,
     title: String,
+    showComposeSearch: Boolean,
     pageEmails: List<com.workbuddy.wearosmail.mail.Email>,
     total: Int,
     unread: Int,
@@ -135,6 +139,19 @@ private fun ScalingLazyListScope.inboxPageContent(
         }
     }
 
+    // 顶部：写邮件 / 搜索并排，两个按钮文字居中。只在「全部邮件」页且已登录时出现。
+    if (showComposeSearch && accountEmail != null) {
+        item {
+            SplitActionRow(
+                leftLabel = "写邮件",
+                onLeft = { vm.startCompose(); nav.navigate("compose") },
+                rightLabel = "搜索",
+                onRight = { nav.navigate("search") },
+                modifier = Modifier.fillParentMaxWidth(),
+            )
+        }
+    }
+
     if (accountEmail == null) {
         item { Hint("登录后显示真实邮件，无内置示例数据") }
         actionChip(
@@ -142,6 +159,7 @@ private fun ScalingLazyListScope.inboxPageContent(
             onClick = { nav.navigate("login") },
             kind = ChipKind.MAIL,
         )
+        settingsEntry(nav, accountCount)
         return
     }
 
@@ -191,25 +209,21 @@ private fun ScalingLazyListScope.inboxPageContent(
         item { Hint("这里还没有邮件") }
     }
 
-    // 「写邮件 + 搜索」合并成一行两个对半相等的按钮
-    item {
-        SplitActionRow(
-            leftLabel = "写邮件",
-            onLeft = { vm.startCompose(); nav.navigate("compose") },
-            rightLabel = "搜索",
-            onRight = { nav.navigate("search") },
-            modifier = Modifier.fillParentMaxWidth(),
-        )
-    }
-
+    // 底部：刷新 + 设置。账号切换与应用内更新都已收口到设置页。
     actionChip(
         label = "刷新",
         onClick = { vm.refresh() },
         kind = ChipKind.UTILITY,
     )
+    settingsEntry(nav, accountCount)
+}
+
+/** 列表底部统一的设置入口。 */
+private fun ScalingLazyListScope.settingsEntry(nav: NavHostController, accountCount: Int) {
     actionChip(
-        label = if (accountCount > 1) "账户 · 切换账号（$accountCount）" else "账户 / 更新",
-        onClick = { nav.navigate("account") },
+        label = "设置",
+        secondaryLabel = "账号 $accountCount · 更新 · 主题 · 关于",
+        onClick = { nav.navigate("settings") },
         kind = ChipKind.UTILITY,
     )
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,43 +45,49 @@ import java.util.Locale
 
 @Composable
 fun WearMailApp(ambient: Boolean, vm: MailViewModel) {
-    // 全局低饱和暗色主题：替换 Wear 默认的高饱和亮紫 primary
-    MaterialTheme(colors = WearMailColors()) {
-        if (ambient) {
-            AmbientScreen(vm)
-            return@MaterialTheme
-        }
+    // 设置页选的种子色 → 官方色阶 → 全局主题，改动即时生效并跨启动保持。
+    val seed by vm.seedColor.collectAsState()
+    val palette = remember(seed) { MailPalette(seed) }
 
-        // 真 Wear OS 设备用官方 SwipeDismissableNavHost（原生右滑返回）；
-        // 普通安卓设备改用标准 NavHost，避免 Wear 专有滑动容器依赖缺失的
-        // 系统能力。两种容器共用同一份导航图。
-        val isWatch = DeviceSupport.isWatch(LocalContext.current)
-        val account by vm.account.collectAsState()
-        val startDestination = if (account == null) "login" else "inbox"
-
-        if (isWatch) {
-            val nav: NavHostController = rememberSwipeDismissableNavController()
-            // 把同一个 swipe state 交给 NavHost 与收件箱分页，让边缘右滑返回
-            // 与分页左右滑互不干扰（Wear 官方 edgeSwipeToDismiss 协调方式）。
-            val swipeState: SwipeToDismissBoxState = rememberSwipeToDismissBoxState()
-            val navHostState: SwipeDismissableNavHostState =
-                rememberSwipeDismissableNavHostState(swipeState)
-            AccountWatcher(account, nav)
-            SwipeDismissableNavHost(
-                navController = nav,
-                startDestination = startDestination,
-                state = navHostState,
-            ) {
-                MailNavGraph(vm, nav, swipeState)
+    CompositionLocalProvider(LocalMailPalette provides palette) {
+        // 全局低饱和暗色主题：primary 跟随用户自定义种子色
+        MaterialTheme(colors = WearMailColors()) {
+            if (ambient) {
+                AmbientScreen(vm)
+                return@MaterialTheme
             }
-        } else {
-            val nav: NavHostController = rememberNavController()
-            AccountWatcher(account, nav)
-            NavHost(
-                navController = nav,
-                startDestination = startDestination,
-            ) {
-                MailNavGraph(vm, nav, null)
+
+            // 真 Wear OS 设备用官方 SwipeDismissableNavHost（原生右滑返回）；
+            // 普通安卓设备改用标准 NavHost，避免 Wear 专有滑动容器依赖缺失的
+            // 系统能力。两种容器共用同一份导航图。
+            val isWatch = DeviceSupport.isWatch(LocalContext.current)
+            val account by vm.account.collectAsState()
+            val startDestination = if (account == null) "login" else "inbox"
+
+            if (isWatch) {
+                val nav: NavHostController = rememberSwipeDismissableNavController()
+                // 把同一个 swipe state 交给 NavHost 与收件箱分页，让边缘右滑返回
+                // 与分页左右滑互不干扰（Wear 官方 edgeSwipeToDismiss 协调方式）。
+                val swipeState: SwipeToDismissBoxState = rememberSwipeToDismissBoxState()
+                val navHostState: SwipeDismissableNavHostState =
+                    rememberSwipeDismissableNavHostState(swipeState)
+                AccountWatcher(account, nav)
+                SwipeDismissableNavHost(
+                    navController = nav,
+                    startDestination = startDestination,
+                    state = navHostState,
+                ) {
+                    MailNavGraph(vm, nav, swipeState)
+                }
+            } else {
+                val nav: NavHostController = rememberNavController()
+                AccountWatcher(account, nav)
+                NavHost(
+                    navController = nav,
+                    startDestination = startDestination,
+                ) {
+                    MailNavGraph(vm, nav, null)
+                }
             }
         }
     }
@@ -112,7 +119,8 @@ private fun NavGraphBuilder.MailNavGraph(
     }
     composable("compose") { ComposeScreen(vm, nav) }
     composable("search") { SearchScreen(vm, nav) }
-    composable("account") { AccountScreen(vm, nav) }
+    // 关于 / 应用内更新 / 账号切换 / 自定义种子色统一收口到设置页
+    composable("settings") { SettingsScreen(vm, nav) }
 }
 
 /**
