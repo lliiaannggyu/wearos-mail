@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 手表硬件特征：Play 商店据此识别为 Wear OS 应用 -->
-    <uses-feature android:name="android.hardware.type.watch" />
+    <!-- 手表硬件特征：Play 商店据此识别为 Wear OS 应用。
+         required=false 让普通安卓手机/平板也能安装（用于预览与兼容运行）；
+         Wear OS 手表上仍按手表应用识别。 -->
+    <uses-feature
+        android:name="android.hardware.type.watch"
+        android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

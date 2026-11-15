@@ -5,17 +5,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.workbuddy.wearosmail.DeviceSupport
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -37,16 +41,29 @@ fun WearScreen(
     listState: ScalingLazyListState,
     content: ScalingLazyListScope.() -> Unit,
 ) {
+    val round = DeviceSupport.isRoundScreen(LocalContext.current)
     Scaffold(
-        timeText = { TimeText() },
-        vignette = { Vignette(VignettePosition.TopAndBottom) },
-        positionIndicator = { PositionIndicator(listState) },
+        timeText = { if (round) TimeText() },
+        vignette = { if (round) Vignette(VignettePosition.TopAndBottom) },
+        positionIndicator = { if (round) PositionIndicator(listState) },
     ) {
-        ScalingLazyColumn(
+        // 圆屏：完全交给 Wear Scaffold 的官方安全区与弧形缩放。
+        // 方形屏（普通安卓手机/平板）：把列表约束到手表宽度并居中，
+        // 避免 Chip 被拉伸成整屏宽、TimeText 的弧形布局在直屏上错位。
+        Box(
             modifier = Modifier.fillMaxSize(),
-            state = listState,
-            content = content,
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            ScalingLazyColumn(
+                modifier = if (round) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier.widthIn(max = 360.dp).fillMaxSize()
+                },
+                state = listState,
+                content = content,
+            )
+        }
     }
 }
 

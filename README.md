@@ -12,9 +12,9 @@
 | 圆屏安全区 / 边缘渐晕 | `Scaffold` + `Vignette` + `TimeText` |
 | 侧边滚动指示 | `PositionIndicator`（绑定 `ScalingLazyListState`） |
 | 右滑返回 | `SwipeDismissableNavHost` + `rememberSwipeDismissableNavController` |
-| 微光 / 常亮模式（Ambient） | `AmbientLifecycleObserver`（`androidx.wear:wear` 当前推荐 API，挂到 Activity Lifecycle），进入微光后切纯黑时钟界面 |
+| 微光 / 常亮模式（Ambient） | `AmbientLifecycleObserver`（`androidx.wear:wear` 当前推荐 API，挂到 Activity Lifecycle），进入微光后切纯黑时钟界面。**按 `DeviceSupport.ambientAvailable()` 条件挂载**，避免无共享库设备启动闪退 |
 | 手表专属控件 | `Chip` / `CompactChip` / `Button` / `CircularProgressIndicator`（Wear Material） |
-| 手表启动器识别 | `uses-feature android.hardware.type.watch` + `com.google.android.wearable.standalone=true` |
+| 手表启动器识别 | `uses-feature android.hardware.type.watch`（`required=false`，便于兼容运行）+ `com.google.android.wearable.standalone=true` |
 | 圆形启动图标 | `mipmap-*/ic_launcher.png` 圆形透明底，`android:roundIcon` |
 
 `AndroidManifest.xml` 里同时声明了 `WAKE_LOCK`（微光常亮）、`REQUEST_INSTALL_PACKAGES`
@@ -52,7 +52,9 @@ export ANDROID_HOME=/opt/android-sdk      # 需 platform-35 + build-tools 34
 
 ```
 app/src/main/kotlin/com/workbuddy/wearosmail/
-├── MainActivity.kt            # ComponentActivity + AmbientLifecycleObserver + setContent
+├── MainActivity.kt            # ComponentActivity + 条件挂载 Ambient + setContent
+├── DeviceSupport.kt           # 设备能力检测（手表 / Wear 共享库 / 圆屏）
+├── CrashLog.kt                # 未捕获异常落盘，下次启动可见
 ├── MailViewModel.kt           # UI 状态（StateFlow）
 ├── mail/
 │   ├── Models.kt              # 账号 / 邮件 / 服务商预设
@@ -60,8 +62,9 @@ app/src/main/kotlin/com/workbuddy/wearosmail/
 │   └── MailRepository.kt      # JavaMail：IMAP 拉取/标记、正文、SMTP 发信
 ├── update/UpdateManager.kt    # GitHub Release 检查 / 下载 / 安装 + version.json 回退
 └── ui/
-    ├── WearApp.kt             # WearMaterialTheme + SwipeDismissableNavHost + 微光界面
-    ├── Common.kt              # Wear Chip 封装 + 圆形输入框
+    ├── WearApp.kt             # WearMaterialTheme + 双导航容器（手表右滑 / 手机标准）+ 微光界面
+    ├── CrashScreen.kt         # 纯 foundation 的启动异常兜底页
+    ├── Common.kt              # Wear Chip 封装 + 圆形输入框 + 方形屏适配
     ├── InboxScreen.kt         # Scaffold + ScalingLazyColumn + PositionIndicator
     ├── DetailScreen.kt / ComposeScreen.kt / LoginScreen.kt
     └── SearchScreen.kt / AccountScreen.kt
@@ -74,6 +77,31 @@ app/src/main/kotlin/com/workbuddy/wearosmail/
 - 账号凭据存于 `SharedPreferences` 明文，仅适用于个人设备；生产环境应改用
   `EncryptedSharedPreferences` 或 OAuth2。
 - 应用内更新需下一个版本发布后才会真正提示；当前 `version.json` 与 Release 已就绪。
+
+## v1.0.1：修复普通安卓设备启动闪退
+
+v1.0.0 在**不带 `com.google.android.wearable` 系统共享库**的设备上（普通安卓手机 /
+平板、部分国产手表、部分模拟器）点开即闪退。根因不是布局或邮件逻辑，而是
+`AmbientLifecycleObserver` 被无条件挂载：它的 `ON_CREATE` 回调会调用
+`SharedLibraryVersion.verifySharedLibraryPresent()`，`Class.forName` 找不到
+`com.google.android.wearable.compat.WearableActivityController` 时直接抛
+`IllegalStateException`，异常发生在 `lifecycle.addObserver()` 的首帧分发里。
+
+修复内容：
+
+| 改动 | 作用 |
+| --- | --- |
+| `DeviceSupport.ambientAvailable()` | 仅当「手表特性」且「共享库类可加载」时才创建 Ambient observer；其余设备跳过微光模式 |
+| `uses-feature ... android:required="false"` | 普通安卓设备可正常安装 |
+| 非手表设备用标准 `NavHost` | 避免 `SwipeDismissableNavHost` 依赖 Wear 系统能力；手表仍用官方右滑返回，两者共用同一份路由表 |
+| 方形屏居中限宽 + 关闭弧形装饰 | 普通安卓直屏上 Chip 不被拉伸、`TimeText`/`Vignette`/`PositionIndicator` 不错位；圆屏行为完全不变 |
+| `CrashLog` + `CrashScreen` | 任何未捕获异常落盘并在下次启动显示堆栈与设备信息，替代「无声闪退」；点按钮清除并重启 |
+| `addObserver` 外层 `runCatching` | 共享库存在但版本不匹配（回调签名变化）时也不崩 |
+
+单元测试 `DeviceSupportTest` 覆盖了四种设备能力组合，确保降级逻辑不被改坏。
+
+> 注意：这仍是 Wear OS 原生应用，兼容运行只是让它在非手表设备上也能启动与预览；
+> 弧形缩放、微光模式、右滑返回等手表特性需要在真正的 Wear OS 设备上才会启用。
 
 ## 与旧版的关系
 

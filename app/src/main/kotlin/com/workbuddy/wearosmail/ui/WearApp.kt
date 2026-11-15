@@ -16,16 +16,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import com.workbuddy.wearosmail.DeviceSupport
 import com.workbuddy.wearosmail.MailViewModel
+import com.workbuddy.wearosmail.mail.MailAccount
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.text.SimpleDateFormat
@@ -40,40 +46,63 @@ fun WearMailApp(ambient: Boolean, vm: MailViewModel) {
             return@MaterialTheme
         }
 
-        val nav: NavHostController = rememberSwipeDismissableNavController()
+        // 真 Wear OS 设备用官方 SwipeDismissableNavHost（原生右滑返回）；
+        // 普通安卓设备改用标准 NavHost，避免 Wear 专有滑动容器依赖缺失的
+        // 系统能力。两种容器共用同一份导航图，页面代码不变。
+        val isWatch = DeviceSupport.isWatch(LocalContext.current)
         val account by vm.account.collectAsState()
+        val startDestination = if (account == null) "login" else "inbox"
 
-        // 登出或被踢回登录时，清掉返回栈，避免右滑回到旧账号的收件箱
-        LaunchedEffect(account) {
-            if (account == null) {
-                nav.navigate("login") {
-                    popUpTo("inbox") { inclusive = true }
-                }
+        if (isWatch) {
+            val nav: NavHostController = rememberSwipeDismissableNavController()
+            AccountWatcher(account, nav)
+            SwipeDismissableNavHost(
+                navController = nav,
+                startDestination = startDestination,
+            ) {
+                MailNavGraph(vm, nav)
             }
-        }
-
-        // SwipeDismissableNavHost 是 Wear OS 官方导航：所有二级页面原生右滑返回
-        SwipeDismissableNavHost(
-            navController = nav,
-            startDestination = if (account == null) "login" else "inbox",
-        ) {
-            composable("login") { LoginScreen(vm, nav) }
-            composable("inbox") { InboxScreen(vm, nav) }
-            composable("detail/{uid}") { entry ->
-                val uid = entry.arguments?.getString("uid")?.toLongOrNull() ?: 0L
-                DetailScreen(vm, nav, uid)
+        } else {
+            val nav: NavHostController = rememberNavController()
+            AccountWatcher(account, nav)
+            NavHost(
+                navController = nav,
+                startDestination = startDestination,
+            ) {
+                MailNavGraph(vm, nav)
             }
-            composable("compose") { ComposeScreen(vm, nav) }
-            composable("search") { SearchScreen(vm, nav) }
-            composable("account") { AccountScreen(vm, nav) }
         }
     }
 }
 
+/** 登出或被踢回登录时清掉返回栈，避免右滑/返回键回到旧账号的收件箱。 */
+@Composable
+private fun AccountWatcher(account: MailAccount?, nav: NavHostController) {
+    LaunchedEffect(account) {
+        if (account == null && nav.currentDestination?.route != "login") {
+            nav.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+}
+
+/** 两种导航容器共用的路由表，保证手表与手机行为一致。 */
+private fun NavGraphBuilder.MailNavGraph(vm: MailViewModel, nav: NavHostController) {
+    composable("login") { LoginScreen(vm, nav) }
+    composable("inbox") { InboxScreen(vm, nav) }
+    composable("detail/{uid}") { entry ->
+        val uid = entry.arguments?.getString("uid")?.toLongOrNull() ?: 0L
+        DetailScreen(vm, nav, uid)
+    }
+    composable("compose") { ComposeScreen(vm, nav) }
+    composable("search") { SearchScreen(vm, nav) }
+    composable("account") { AccountScreen(vm, nav) }
+}
+
 /**
- * 微光（Ambient / always-on）界面。
- * 由 FragmentActivity + AmbientModeSupport 在进入低功耗状态时切换过来：
- * 纯黑底、白色时钟、无动画、低刷新，符合 Wear OS 微光模式规范。
+ * 微光（Ambient / always-on）界面：纯黑底、白色时钟、无动画、低刷新，
+ * 符合 Wear OS 微光模式规范。仅在具备 Wear 共享库的手表上会出现。
  */
 @Composable
 private fun AmbientScreen(vm: MailViewModel) {
