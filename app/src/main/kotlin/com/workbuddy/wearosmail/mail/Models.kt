@@ -27,6 +27,20 @@ data class Email(
 
 enum class MailFilter { ALL, UNREAD, STARRED }
 
+/** 三页分页与搜索共用的纯过滤逻辑（无 Android 依赖，便于 JVM 单测）。 */
+fun filterEmails(list: List<Email>, filter: MailFilter, query: String = ""): List<Email> =
+    list.filter { e ->
+        when (filter) {
+            MailFilter.ALL -> true
+            MailFilter.UNREAD -> !e.isRead
+            MailFilter.STARRED -> e.isStarred
+        }
+    }.filter { e ->
+        query.isBlank() || e.subject.contains(query, true) ||
+            e.displayFrom.contains(query, true) ||
+            e.fromAddress.contains(query, true) || e.body.contains(query, true)
+    }
+
 object MailPresets {
     data class Preset(
         val label: String,

@@ -27,7 +27,10 @@
   中文主题、MIME 编码、多部分正文由 JavaMail 解码，不自己造轮子。
 - **服务商预设**：QQ / 163 / Gmail / Outlook / 自定义，使用**授权码**登录（不是邮箱密码）。
 - **零虚假数据**：没有任何内置示例邮件。未登录就是空态 + 登录引导；「演示模式」已彻底移除。
-- 页面：收件箱、邮件详情（按需取正文）、写邮件 / 回复、本地搜索、账户与更新。
+- **多账号**：可同时保存多个账号，账户页点一下即切换，不用重新登录；每个账号的收件箱有独立内存缓存，切换秒显再后台刷新。旧版单账号数据自动迁移。
+- **官方色阶配色**：以 Google Material 3 官方「种子色 → Tonal Palette 色阶」为基础，按官方 tone 亮度标尺生成低饱和暗色，替换 Wear 默认高饱和亮紫 primary。不同功能按钮用不同种子色分开：邮件（紫）、搜索（青）、写/发邮件（绿）、其他（中性灰）、危险操作（红）。所有按钮统一宽度。
+- **三页左右滑动**：收件箱用官方 `HorizontalPager` + `HorizontalPageIndicator` 做「全部 / 未读 / 星标」三页左右滑动切换，去掉了原来的点击切换按钮；手表上用官方 `edgeSwipeToDismiss` 与右滑返回协调手势。写邮件与搜索合并为一行两个对半相等的按钮。
+- 页面：收件箱（三页）、邮件详情（按需取正文）、写邮件 / 回复、本地搜索、账户与更新。
 - **应用内更新**：启动静默检查 GitHub Release，账户页手动检查 → 下载（Wear 圆环 + 百分比）
   → `FileProvider` 拉起系统安装器。GitHub API 匿名限流（60 次/小时/IP）时自动回退
   仓库静态 `version.json`（raw 域名无限流），所有请求带 `User-Agent`。
@@ -37,7 +40,7 @@
 ```bash
 export ANDROID_HOME=/opt/android-sdk      # 需 platform-35 + build-tools 34
 ./gradlew :app:assembleRelease
-./gradlew :app:testReleaseUnitTest   # 版本比较单测
+./gradlew :app:testReleaseUnitTest   # 26 项 JVM 单测（色阶 / 多账号 / 过滤 / 版本 / 设备能力）
 ```
 
 - Gradle 发行版：`mirrors.cloud.tencent.com/gradle/gradle-8.9-bin.zip`
@@ -55,27 +58,43 @@ app/src/main/kotlin/com/workbuddy/wearosmail/
 ├── MainActivity.kt            # ComponentActivity + 条件挂载 Ambient + setContent
 ├── DeviceSupport.kt           # 设备能力检测（手表 / Wear 共享库 / 圆屏）
 ├── CrashLog.kt                # 未捕获异常落盘，下次启动可见
-├── MailViewModel.kt           # UI 状态（StateFlow）
+├── MailViewModel.kt           # UI 状态（StateFlow）+ 多账号切换/缓存
 ├── mail/
-│   ├── Models.kt              # 账号 / 邮件 / 服务商预设
-│   ├── AccountStore.kt        # SharedPreferences 账号记忆
+│   ├── Models.kt              # 账号 / 邮件 / 服务商预设 / 纯过滤逻辑
+│   ├── AccountSet.kt          # 多账号集合纯逻辑（可 JVM 单测）
+│   ├── AccountStore.kt        # SharedPreferences 多账号 JSON + 旧版迁移
 │   └── MailRepository.kt      # JavaMail：IMAP 拉取/标记、正文、SMTP 发信
 ├── update/UpdateManager.kt    # GitHub Release 检查 / 下载 / 安装 + version.json 回退
 └── ui/
-    ├── WearApp.kt             # WearMaterialTheme + 双导航容器（手表右滑 / 手机标准）+ 微光界面
+    ├── WearApp.kt             # 低饱和主题 + 双导航容器 + 微光界面
+    ├── MailPalette.kt         # Material 3 官方色阶种子色 + 功能分类
     ├── CrashScreen.kt         # 纯 foundation 的启动异常兜底页
-    ├── Common.kt              # Wear Chip 封装 + 圆形输入框 + 方形屏适配
-    ├── InboxScreen.kt         # Scaffold + ScalingLazyColumn + PositionIndicator
+    ├── Common.kt              # 统一宽度按钮 / 合并按钮行 / 主题色 / 通用 Scaffold
+    ├── InboxScreen.kt         # HorizontalPager 三页 + HorizontalPageIndicator
     ├── DetailScreen.kt / ComposeScreen.kt / LoginScreen.kt
     └── SearchScreen.kt / AccountScreen.kt
 ```
+
+## v1.1.0：官方色阶配色 / 多账号 / 三页滑动 / 合并按钮
+
+| 诉求 | 实现 |
+| --- | --- |
+| 按钮统一宽度 | `ActionChip` 组件 + `ScalingLazyListScope.actionChip` 扩展，所有按钮统一 `fillParentMaxWidth()`；原 `CompactChip` 全部换成统一 Chip |
+| 多账号切换 | `AccountSet`（纯逻辑）+ `AccountStore`（多账号 JSON 存储 + 旧版单账号迁移）+ ViewModel 账号列表/切换/移除；账户页点击即切换，每账号独立内存缓存，不用重新登录 |
+| 谷歌官方色阶种子色 | `MailPalette` 以 Material 3 官方「种子色 → Tonal Palette」为模型，按 tone 亮度标尺生成 0–100 色阶；5 组官方种子色对应 5 类功能 |
+| 颜色改淡改暗 | 按钮容器取 tone≈30（暗），文字取 tone≈92（柔和浅色），色度向黑白两端衰减；全局 `Colors` 替换高饱和 primary |
+| 功能分色 | 邮件 / 搜索 / 写发 / 其他 / 危险 各自种子色，色相分离、互不串色 |
+| 写邮件+搜索合并行 | `SplitActionRow`：一行两个 `weight(1f)` 等宽按钮，左写邮件（绿）、右搜索（青） |
+| 去掉筛选切换，改三页滑动 | `HorizontalPager` + Wear `HorizontalPageIndicator`，全部/未读/星标三页左右滑动；`edgeSwipeToDismiss` 与右滑返回协调 |
+
+单元测试覆盖：官方色阶亮度单调/两端黑白/低饱和/对比度/功能色相分离、多账号增删切换与旧版迁移、三页过滤与关键字叠加。
 
 ## 已知边界
 
 - 搜索是对已拉取邮件的本地过滤，不是 IMAP `SEARCH`（手表小屏够用，避免全量下载）。
 - 只做 INBOX 单文件夹；归档/删除未做（避免用「本地隐藏」冒充服务器同步）。
-- 账号凭据存于 `SharedPreferences` 明文，仅适用于个人设备；生产环境应改用
-  `EncryptedSharedPreferences` 或 OAuth2。
+- 账号凭据存于 `SharedPreferences` 明文（多账号以 JSON 数组保存），仅适用于个人设备；
+  生产环境应改用 `EncryptedSharedPreferences` 或 OAuth2。
 - 应用内更新需下一个版本发布后才会真正提示；当前 `version.json` 与 Release 已就绪。
 
 ## v1.0.1：修复普通安卓设备启动闪退

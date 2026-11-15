@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.ListHeader
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -18,7 +17,8 @@ import com.workbuddy.wearosmail.mail.MailFilter
 fun SearchScreen(vm: MailViewModel, nav: NavHostController) {
     val listState = rememberScalingLazyListState()
     val query by vm.query.collectAsState()
-    val results by vm.visibleEmails.collectAsState()
+    // 搜索用独立的 searchResults（不受三页分页 filter 影响）
+    val results by vm.searchResults.collectAsState()
 
     LaunchedEffect(Unit) { vm.setFilter(MailFilter.ALL) }
 
@@ -40,17 +40,17 @@ fun SearchScreen(vm: MailViewModel, nav: NavHostController) {
                             vm.open(e.uid)
                             nav.navigate("detail/${e.uid}")
                         },
+                        colors = chipColors(ChipKind.SEARCH),
                         modifier = Modifier.fillParentMaxWidth(),
                     )
                 }
             }
         }
 
-        item {
-            CompactChip(
-                onClick = { vm.setQuery(""); nav.popBackStack() },
-                label = { Text("返回") },
-            )
-        }
+        actionChip(
+            label = "返回",
+            kind = ChipKind.UTILITY,
+            onClick = { vm.setQuery(""); nav.popBackStack() },
+        )
     }
 }

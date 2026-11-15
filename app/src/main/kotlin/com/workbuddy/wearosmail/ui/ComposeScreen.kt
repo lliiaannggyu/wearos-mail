@@ -6,13 +6,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.CircularProgressIndicator
-import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.ListHeader
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -35,29 +32,29 @@ fun ComposeScreen(vm: MailViewModel, nav: NavHostController) {
         item { RoundTextField(body, { body = it }, "正文", singleLine = false) }
 
         if (status != null) {
-            item { Text(status ?: "", color = Color(0xFFFFB4AB), fontSize = 12.sp) }
+            item { Text(status ?: "", color = Color(0xFFF2B8B5), fontSize = 12.sp) }
         }
         if (sending) {
             item { CircularProgressIndicator() }
         }
 
-        item {
-            Chip(
-                label = { Text(if (sending) "发送中…" else "发送") },
-                onClick = {
-                    if (!sending) {
-                        status = null
-                        vm.send(to, subject, body) { ok, msg ->
-                            if (ok) nav.popBackStack() else status = msg
-                        }
+        actionChip(
+            label = if (sending) "发送中…" else "发送",
+            kind = ChipKind.COMPOSE,
+            enabled = !sending,
+            onClick = {
+                if (!sending) {
+                    status = null
+                    vm.send(to, subject, body) { ok, msg ->
+                        if (ok) nav.popBackStack() else status = msg
                     }
-                },
-                enabled = !sending,
-                modifier = Modifier.fillParentMaxWidth(),
-            )
-        }
-        item {
-            CompactChip(onClick = { nav.popBackStack() }, label = { Text("取消") })
-        }
+                }
+            },
+        )
+        actionChip(
+            label = "取消",
+            kind = ChipKind.UTILITY,
+            onClick = { nav.popBackStack() },
+        )
     }
 }

@@ -2,11 +2,13 @@ package com.workbuddy.wearosmail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workbuddy.wearosmail.mail.AccountSet
 import com.workbuddy.wearosmail.mail.AccountStore
 import com.workbuddy.wearosmail.mail.Email
 import com.workbuddy.wearosmail.mail.MailAccount
 import com.workbuddy.wearosmail.mail.MailFilter
 import com.workbuddy.wearosmail.mail.MailRepository
+import com.workbuddy.wearosmail.mail.filterEmails
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,8 +22,18 @@ import javax.mail.Flags
 class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
     private val repo = MailRepository()
 
-    private val _account = MutableStateFlow<MailAccount?>(null)
-    val account: StateFlow<MailAccount?> = _account.asStateFlow()
+    // ---- 多账号：账号集合是唯一数据源，activeEmail 决定「当前在用」 ----
+    private val _accountSet = MutableStateFlow(AccountSet.EMPTY)
+    val accountSet: StateFlow<AccountSet> = _accountSet.asStateFlow()
+
+    val accounts: StateFlow<List<MailAccount>> = _accountSet
+        .map { it.accounts }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 当前激活账号；未登录或全部账号被移除时为 null。 */
+    val account: StateFlow<MailAccount?> = _accountSet
+        .map { it.active }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _emails = MutableStateFlow<List<Email>>(emptyList())
     val emails: StateFlow<List<Email>> = _emails.asStateFlow()
@@ -53,20 +65,18 @@ class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
     private val _draftSubject = MutableStateFlow("")
     val draftSubject: StateFlow<String> = _draftSubject.asStateFlow()
 
+    /** 每个账号的收件箱内存缓存：切换账号时先秒显缓存，再后台刷新。 */
+    private val mailCache = mutableMapOf<String, List<Email>>()
+
+    /** 搜索页结果（不受三页分页 filter 影响，始终 ALL + 关键字）。 */
+    val searchResults: StateFlow<List<Email>> =
+        combine(_emails, _query) { list, q -> filterEmails(list, MailFilter.ALL, q) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 单页/兼容用的可见邮件（保留给仍按 filter 消费的地方）。 */
     val visibleEmails: StateFlow<List<Email>> =
-        combine(_emails, _filter, _query) { list, f, q ->
-            list.filter { e ->
-                when (f) {
-                    MailFilter.ALL -> true
-                    MailFilter.UNREAD -> !e.isRead
-                    MailFilter.STARRED -> e.isStarred
-                }
-            }.filter { e ->
-                q.isBlank() || e.subject.contains(q, true) ||
-                    e.displayFrom.contains(q, true) ||
-                    e.fromAddress.contains(q, true) || e.body.contains(q, true)
-            }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        combine(_emails, _filter, _query) { list, f, q -> filterEmails(list, f, q) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val unreadCount: StateFlow<Int> = _emails
         .map { list -> list.count { !it.isRead } }
@@ -74,36 +84,91 @@ class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
 
     init {
         val saved = accountStore.load()
-        _account.value = saved
-        if (saved != null) refresh()
+        _accountSet.value = saved
+        if (saved.active != null) refresh()
     }
 
-    fun login(a: MailAccount) {
-        accountStore.save(a)
-        _account.value = a
-        refresh()
+    // ---- 账号管理 ----
+
+    /** 登录：新增/更新账号并激活，随后拉取该账号收件箱。 */
+    fun login(a: MailAccount) = commit(_accountSet.value.addOrUpdate(a), refresh = true)
+
+    /** 切换到已保存账号，不重新登录；已有缓存则秒显，无缓存才正常拉取。 */
+    fun switchAccount(email: String) {
+        val cur = _accountSet.value
+        val next = cur.switchTo(email)
+        if (next.activeEmail == cur.activeEmail) return
+        val key = next.active?.email ?: return
+        val cached = mailCache[key]
+        _emails.value = cached ?: emptyList()
+        _current.value = null
+        _error.value = null
+        _query.value = ""
+        _filter.value = MailFilter.ALL
+        // 先持久化新集合（不触发带 loading 的全量刷新），再决定刷新方式
+        _accountSet.value = next
+        accountStore.save(next)
+        if (cached == null) refresh() else refreshSilently()
     }
 
+    /** 移除单个账号；若移除的是当前账号，自动切到剩余第一个。 */
+    fun removeAccount(email: String) {
+        val wasActive = _accountSet.value.isActive(email)
+        val next = _accountSet.value.remove(email)
+        if (next === _accountSet.value) return
+        mailCache.remove(email)
+        if (next.active == null) {
+            _emails.value = emptyList()
+            _current.value = null
+        }
+        commit(next, refresh = wasActive && next.active != null)
+    }
+
+    /** 退出全部账号并清空缓存。 */
     fun logout() {
-        accountStore.clear()
-        _account.value = null
+        mailCache.clear()
         _emails.value = emptyList()
         _current.value = null
         _error.value = null
+        _query.value = ""
+        accountStore.clear()
+        _accountSet.value = AccountSet.EMPTY
     }
 
+    private fun commit(set: AccountSet, refresh: Boolean) {
+        _accountSet.value = set
+        accountStore.save(set)
+        if (refresh) refresh()
+    }
+
+    // ---- 邮件操作 ----
+
     fun refresh() {
-        val a = _account.value ?: return
+        val a = _accountSet.value.active ?: return
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
             try {
-                _emails.value = repo.fetchInbox(a, 40)
+                val list = repo.fetchInbox(a, 40)
+                mailCache[a.email] = list
+                _emails.value = list
             } catch (e: Exception) {
                 _error.value = friendly(e)
             } finally {
                 _loading.value = false
             }
+        }
+    }
+
+    /** 有缓存时的静默刷新，不打断 UI（不弹 loading/error）。 */
+    private fun refreshSilently() {
+        val a = _accountSet.value.active ?: return
+        viewModelScope.launch {
+            runCatching { repo.fetchInbox(a, 40) }
+                .onSuccess { list ->
+                    mailCache[a.email] = list
+                    _emails.value = list
+                }
         }
     }
 
@@ -125,7 +190,7 @@ class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
     fun open(uid: Long) {
         val local = _emails.value.firstOrNull { it.uid == uid } ?: return
         _current.value = local
-        val a = _account.value ?: return
+        val a = _accountSet.value.active ?: return
         if (!local.isRead) {
             _emails.value = _emails.value.map {
                 if (it.uid == uid) it.copy(isRead = true) else it
@@ -150,10 +215,9 @@ class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
         _current.value?.let { cur ->
             if (cur.uid == uid) _current.value = cur.copy(isStarred = next)
         }
-        val a = _account.value ?: return
+        val a = _accountSet.value.active ?: return
         viewModelScope.launch {
             if (runCatching { repo.setFlag(a, uid, Flags.Flag.FLAGGED, next) }.isFailure) {
-                // 服务器写回失败时回滚本地状态，避免假装同步成功
                 _emails.value = _emails.value.map {
                     if (it.uid == uid) it.copy(isStarred = !next) else it
                 }
@@ -166,7 +230,7 @@ class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
     }
 
     fun send(to: String, subject: String, body: String, onDone: (Boolean, String) -> Unit) {
-        val a = _account.value
+        val a = _accountSet.value.active
         if (a == null) { onDone(false, "尚未登录"); return }
         if (to.isBlank()) { onDone(false, "请填写收件人"); return }
         viewModelScope.launch {
