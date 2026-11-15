@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "apk": "https://github.com/lliiaannggyu/wearos-mail/releases/download/v1.1.0/wearos-mail-v1.1.0.apk",
+  "version": "1.2.0",
+  "apk": "https://github.com/lliiaannggyu/wearos-mail/releases/download/v1.2.0/wearos-mail-v1.2.0.apk",
   "size": 1579816,
-  "note": "v1.1.0 官方色阶配色 / 多账号切换 / 三页左右滑动 / 合并按钮行。size 在发版时回填。GitHub API 限流时应用会回退读取本文件。发版时必须与 app/build.gradle.kts 的 versionName 同步。"
+  "note": "v1.2.0 设置页：关于信息 / 应用内更新 / 账号切换 / 谷歌官方色阶自定义种子色；写邮件与搜索移至「全部邮件」页顶部并居中。size 为 APK 字节数。GitHub API 限流时应用会回退读取本文件。发版时必须与 app/build.gradle.kts 的 versionName 同步。"
 }

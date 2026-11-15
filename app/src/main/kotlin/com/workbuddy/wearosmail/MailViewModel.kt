@@ -9,6 +9,7 @@ import com.workbuddy.wearosmail.mail.MailAccount
 import com.workbuddy.wearosmail.mail.MailFilter
 import com.workbuddy.wearosmail.mail.MailRepository
 import com.workbuddy.wearosmail.mail.filterEmails
+import com.workbuddy.wearosmail.ui.SeedColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.mail.Flags
 
-class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
+class MailViewModel(
+    private val accountStore: AccountStore,
+    private val themeStore: ThemeStore,
+) : ViewModel() {
     private val repo = MailRepository()
 
     // ---- 多账号：账号集合是唯一数据源，activeEmail 决定「当前在用」 ----
@@ -86,6 +90,23 @@ class MailViewModel(private val accountStore: AccountStore) : ViewModel() {
         val saved = accountStore.load()
         _accountSet.value = saved
         if (saved.active != null) refresh()
+    }
+
+    // ---- 主题：用户自定义的 Google 官方色阶种子色 ----
+    private val _seedColor = MutableStateFlow(themeStore.load())
+    val seedColor: StateFlow<Long> = _seedColor.asStateFlow()
+
+    /** 选择新种子色：立即全局生效并持久化，下次启动保持。 */
+    fun setSeedColor(seed: Long) {
+        if (!SeedColors.isValid(seed)) return
+        _seedColor.value = seed
+        themeStore.save(seed)
+    }
+
+    /** 恢复官方 baseline 紫。 */
+    fun resetSeedColor() {
+        _seedColor.value = SeedColors.DEFAULT
+        themeStore.reset()
     }
 
     // ---- 账号管理 ----
