@@ -13,14 +13,14 @@
 -dontwarn kotlinx.coroutines.**
 
 # 应用内更新（版本号从 BuildConfig 之外的常量读取，StateFlow 状态类保留）
--keep class com.workbuddy.wearosmail.update.** { *; }
+-keep class com.tengwear.tengemail.update.** { *; }
 
 # Wear OS 微光模式：AmbientLifecycleObserver 由 androidx.wear 通过反射回调，
 # 且共享库类在普通安卓设备上不存在，必须允许缺失并保留自身兼容类。
 -keep class androidx.wear.ambient.** { *; }
 -dontwarn com.google.android.wearable.**
 -dontwarn androidx.wear.ambient.**
--keep class com.workbuddy.wearosmail.DeviceSupport { *; }
--keep class com.workbuddy.wearosmail.CrashLog { *; }
--keep class com.workbuddy.wearosmail.CrashLog$CrashCatcher { *; }
--keep class com.workbuddy.wearosmail.ui.CrashScreenKt { *; }
+-keep class com.tengwear.tengemail.DeviceSupport { *; }
+-keep class com.tengwear.tengemail.CrashLog { *; }
+-keep class com.tengwear.tengemail.CrashLog$CrashCatcher { *; }
+-keep class com.tengwear.tengemail.ui.CrashScreenKt { *; }

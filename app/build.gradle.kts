@@ -13,16 +13,16 @@ val keystorePropsFile = rootProject.file("keystore.properties")
 val hasReleaseKeystore = keystorePropsFile.exists()
 
 android {
-    namespace = "com.workbuddy.wearosmail"
+    namespace = "com.tengwear.tengemail"
     compileSdk = 35
     buildToolsVersion = "34.0.0"
 
     defaultConfig {
-        applicationId = "com.workbuddy.wearosmail"
+        applicationId = "com.tengwear.tengemail"
         minSdk = 25
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.3.0"
     }
 
     signingConfigs {
