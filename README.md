@@ -1,4 +1,6 @@
-# Wear Mail — Wear OS 原生邮箱客户端
+# TENG邮箱 — Wear OS 原生邮箱客户端
+
+应用名 **TENG邮箱**，包名 `com.tengwear.tengemail`。
 
 一个**从工程地基上就是 Wear OS 应用**的邮箱客户端：Kotlin + Compose for Wear OS +
 `androidx.wear`，不是「普通 Android 应用改 UI」。`minSdk 25` / `targetSdk 35`，
@@ -15,7 +17,7 @@
 | 微光 / 常亮模式（Ambient） | `AmbientLifecycleObserver`（`androidx.wear:wear` 当前推荐 API，挂到 Activity Lifecycle），进入微光后切纯黑时钟界面。**按 `DeviceSupport.ambientAvailable()` 条件挂载**，避免无共享库设备启动闪退 |
 | 手表专属控件 | `Chip` / `CompactChip` / `Button` / `CircularProgressIndicator`（Wear Material） |
 | 手表启动器识别 | `uses-feature android.hardware.type.watch`（`required=false`，便于兼容运行）+ `com.google.android.wearable.standalone=true` |
-| 圆形启动图标 | `mipmap-*/ic_launcher.png` 圆形透明底，`android:roundIcon` |
+| 启动图标 | 白色信封 + 蓝灰底的官方自适应图标：`mipmap-*/ic_launcher.png` 与 `ic_launcher_foreground/background/monochrome.png`，`mipmap-anydpi-v26/ic_launcher.xml` 声明 background / foreground / monochrome，配 `android:roundIcon` |
 
 `AndroidManifest.xml` 里同时声明了 `WAKE_LOCK`（微光常亮）、`REQUEST_INSTALL_PACKAGES`
 （应用内更新）与 `FileProvider`。这些是普通 Android 应用不需要、Wear OS 应用才需要的东西。
@@ -27,6 +29,7 @@
   中文主题、MIME 编码、多部分正文由 JavaMail 解码，不自己造轮子。
 - **服务商预设**：QQ / 163 / Gmail / Outlook / 自定义，使用**授权码**登录（不是邮箱密码）。
 - **零虚假数据**：没有任何内置示例邮件。未登录就是空态 + 登录引导；「演示模式」已彻底移除。
+- **使用协议**：首次启动先展示完整协议，**必须滑动到最底部**才能启用「同意并开始使用」；不同意则退出且不可使用任何邮箱功能。同意状态按协议版本持久化，条款修订后需重新同意。
 - **多账号**：可同时保存多个账号，设置页点一下即切换，不用重新登录；每个账号的收件箱有独立内存缓存，切换秒显再后台刷新。旧版单账号数据自动迁移。
 - **官方色阶配色**：以 Google Material 3 官方「种子色 → Tonal Palette 色阶」为基础，按官方 tone 亮度标尺生成低饱和暗色，替换 Wear 默认高饱和亮紫 primary。不同功能按钮用不同种子色分开：邮件（可自定义）、搜索（青）、写/发邮件（绿）、其他（中性灰）、危险操作（红）。所有按钮统一宽度。
 - **自定义种子色**：设置页可从 8 组 Google 官方色板预设里选，或直接输入 `#RRGGBB` 自定义；主色按官方 tone 色阶实时重算、全局生效并跨启动保存，另有 tone 10→95 色阶预览条。
@@ -56,12 +59,15 @@ export ANDROID_HOME=/opt/android-sdk      # 需 platform-35 + build-tools 34
 ## 目录
 
 ```
-app/src/main/kotlin/com/workbuddy/wearosmail/
-├── MainActivity.kt            # ComponentActivity + 条件挂载 Ambient + setContent
+app/src/main/kotlin/com/tengwear/tengemail/
+├── MainActivity.kt            # ComponentActivity + 条件挂载 Ambient + 协议不同意时 finish
 ├── DeviceSupport.kt           # 设备能力检测（手表 / Wear 共享库 / 圆屏）
 ├── CrashLog.kt                # 未捕获异常落盘，下次启动可见
 ├── MailViewModel.kt           # UI 状态（StateFlow）+ 多账号切换/缓存 + 自定义种子色
 ├── ThemeStore.kt              # SharedPreferences 保存自定义种子色
+├── EulaText.kt                # 使用协议正文（10 节）+ 协议版本号
+├── EulaGate.kt                # 纯逻辑：滑到底才允许同意 / 按版本判断是否已同意
+├── EulaStore.kt               # SharedPreferences 保存已同意的协议版本
 ├── mail/
 │   ├── Models.kt              # 账号 / 邮件 / 服务商预设 / 纯过滤逻辑
 │   ├── AccountSet.kt          # 多账号集合纯逻辑（可 JVM 单测）
@@ -69,7 +75,8 @@ app/src/main/kotlin/com/workbuddy/wearosmail/
 │   └── MailRepository.kt      # JavaMail：IMAP 拉取/标记、正文、SMTP 发信
 ├── update/UpdateManager.kt    # GitHub Release 检查 / 下载 / 安装 + version.json 回退
 └── ui/
-    ├── WearApp.kt             # CompositionLocal 主题 + 双导航容器 + 微光界面
+    ├── WearApp.kt             # 协议 gate + CompositionLocal 主题 + 双导航容器 + 微光界面
+    ├── EulaScreen.kt          # 首屏协议页：到底判断 + 禁用/启用同意按钮
     ├── MailPalette.kt         # Material 3 官方色阶 / SeedColors 官方预设与 HEX 解析
     ├── CrashScreen.kt         # 纯 foundation 的启动异常兜底页
     ├── Common.kt              # 统一宽度按钮 / 居中合并按钮行 / 主题色 / 通用 Scaffold
@@ -77,6 +84,25 @@ app/src/main/kotlin/com/workbuddy/wearosmail/
     ├── SettingsScreen.kt      # 关于 / 应用内更新 / 官方色阶自定义种子色 / 账号切换
     └── DetailScreen.kt / ComposeScreen.kt / LoginScreen.kt / SearchScreen.kt
 ```
+
+单测目录 `app/src/test/java/com/tengwear/tengemail/` 另有 `EulaGateTest.kt`（协议门槛与版本）。
+
+## v1.3.0：换图标 / 更名改包名 / 首屏使用协议
+
+| 诉求 | 实现 |
+| --- | --- |
+| 启动图标换成指定图案 | 白色信封 + 蓝灰底：各密度 `mipmap-*/ic_launcher.png` 与 `ic_launcher_foreground/background/monochrome.png`，`mipmap-anydpi-v26/ic_launcher.xml` 声明官方自适应图标（含 monochrome 主题图标） |
+| 名字改 TENG邮箱 | `strings.xml` 的 `app_name`、设置页「关于」、微光界面文案统一改为 **TENG邮箱** |
+| 包名改 `com.tengwear.tengemail` | `namespace` / `applicationId`、全部 Kotlin `package` 与 `import`、源码与测试目录、`proguard-rules.pro` 的 keep 规则、设置页关于信息全量替换 |
+| 拟一份使用协议 | `EulaText` 分 10 节：协议接受、软件性质、账号与凭据、数据与隐私、网络与更新、开源与第三方组件、使用限制、免责声明、条款变更、其他 |
+| 放在软件使用开头 | `WearMailApp` 最外层协议 gate：未同意只渲染 `EulaScreen`，不创建 NavHost，**不进入任何邮箱页面**；不同意直接 `finish()` |
+| 滑到底才能点同意 | `derivedStateOf` 读取 `ScalingLazyListState.layoutInfo` 的 `visibleItemsInfo.lastOrNull()?.index` 与 `totalItemsCount`，`EulaGate.canAgree` 为 false 时「同意并开始使用」按钮 disabled；协议正文足够长，必须实际滑动 |
+| 同意后才可使用 | 同意状态写入 `EulaStore`（SharedPreferences，按协议版本号存储）；条款修订提升 `EulaText.VERSION` 即强制重新同意 |
+
+单测新增 `EulaGateTest`：未到底/到底/空列表边界、按版本重新同意、协议正文完整性。
+
+> 注意：包名变了，v1.3.0 与旧版（`com.workbuddy.wearosmail`）在 Android 上是**两个不同应用**，
+> 无法覆盖安装；需先卸载旧包，旧包里的账号也不会自动迁移到新包。
 
 ## v1.2.0：设置页收口 / 顶部按钮 / 自定义种子色
 
@@ -86,7 +112,7 @@ app/src/main/kotlin/com/workbuddy/wearosmail/
 | 只在「全部邮件」页保留 | `showComposeSearch = filter == MailFilter.ALL`，未读 / 星标两页不渲染；未登录时也不显示 |
 | 两个按钮文字居中 | `SplitActionRow` 的 label `Text` 加 `textAlign = TextAlign.Center` + `fillMaxWidth()` |
 | 列表底部设置入口 | 三页共用 `settingsEntry()`，一个「设置」Chip 进 `settings` 路由；原「账户 / 更新」按钮移除 |
-| 设置页 · 关于 | 软件名 Wear 邮箱、版本、包名、平台（Wear OS / 普通安卓 API 25+）、IMAP/SMTP 说明、开源地址 |
+| 设置页 · 关于 | 软件名、版本、包名、平台（Wear OS / 普通安卓 API 25+）、IMAP/SMTP 说明、开源地址（v1.3.0 起软件名为 TENG邮箱） |
 | 设置页 · 应用内更新 | 检查 / 下载 / 安装状态机整体搬入设置页，`UpdateManager` 不变 |
 | 设置页 · 账号切换 | 原 `AccountScreen` 的多账号列表 / 添加 / 移除 / 退出全部并入，删除旧文件与路由 |
 | 设置页 · 官方色阶自定义种子色 | `SeedColors`（8 组 Google 官方色板预设 + `#RRGGBB` 解析）+ `ThemeStore` 持久化 + `MailPalette(seed)` 按官方 tone 标尺重算主色；`LocalMailPalette` 让全局即时换色，附 tone 10→95 色阶预览条 |
