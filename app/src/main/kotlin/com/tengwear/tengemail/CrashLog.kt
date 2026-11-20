@@ -40,7 +40,12 @@ object CrashLog {
     ) : Thread.UncaughtExceptionHandler {
         override fun uncaughtException(t: Thread, e: Throwable) {
             runCatching {
+                val version = runCatching {
+                    app.packageManager.getPackageInfo(app.packageName, 0).versionName ?: "?"
+                }.getOrDefault("?")
                 val text = buildString {
+                    append("应用: TENG邮箱 v").append(version)
+                        .append(" (").append(app.packageName).append(")\n")
                     append("包名: ").append(app.packageName).append('\n')
                     append("设备: ").append(Build.MANUFACTURER).append(' ')
                         .append(Build.MODEL).append('\n')
