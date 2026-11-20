@@ -104,6 +104,19 @@ app/src/main/kotlin/com/tengwear/tengemail/
 > 注意：包名变了，v1.3.0 与旧版（`com.workbuddy.wearosmail`）在 Android 上是**两个不同应用**，
 > 无法覆盖安装；需先卸载旧包，旧包里的账号也不会自动迁移到新包。
 
+## v1.3.2：修复 Wear OS 5 启动崩溃
+
+> 真机崩溃报告（Samsung SM-R920 / Android 14 / targetSdk 35）：`SwipeDismissableNavHost`
+> 组合时，`Wear Compose 1.4.0` 的 `LocalReduceMotion` 读 `Settings.Global.reduce_motion`
+> 抛 `SecurityException`（该 key 仅对 targetSdk ≤ 34 的应用可读），首页组合整体崩溃。
+
+| 修复 | 说明 |
+| --- | --- |
+| Wear Compose 1.4.0 → 1.4.1 | AndroidX 官方补丁版，`LocalReduceMotion` 读取 `reduce_motion` 加了异常保护，根治该崩溃 |
+| targetSdk 35 → 34 | Google 官方对 Wear OS 5 的推荐值，直接消除「targetSdk > 34 不可读该 key」的系统限制；minSdk 仍为 25 |
+
+两处同时修改是双保险：即使将来某设备仍触发该设置读取，1.4.1 的异常保护也不会让应用闪退。
+
 ## v1.3.1：崩溃报告可复制
 
 | 诉求 | 实现 |

@@ -20,9 +20,12 @@ android {
     defaultConfig {
         applicationId = "com.tengwear.tengemail"
         minSdk = 25
-        targetSdk = 35
-        versionCode = 6
-        versionName = "1.3.1"
+        // Wear OS 5（Android 14 / API 34）官方推荐 targetSdk 34。
+        // targetSdk 35 时读取 Settings.Global.reduce_motion 会抛 SecurityException，
+        // 导致 Wear Compose 的 LocalReduceMotion 在组合首页时崩溃。
+        targetSdk = 34
+        versionCode = 7
+        versionName = "1.3.2"
     }
 
     signingConfigs {
@@ -90,9 +93,11 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.3")
 
     // ---- Wear OS 官方工具包：弧形列表 / 圆屏 Scaffold / 右滑返回 / 微光模式 ----
-    implementation("androidx.wear.compose:compose-material:1.4.0")
-    implementation("androidx.wear.compose:compose-foundation:1.4.0")
-    implementation("androidx.wear.compose:compose-navigation:1.4.0")
+    // 1.4.1 修复 LocalReduceMotion 读取 Settings.Global.reduce_motion 抛
+    // SecurityException 的启动崩溃（targetSdk >= 35 + Android 14 手表上必现）。
+    implementation("androidx.wear.compose:compose-material:1.4.1")
+    implementation("androidx.wear.compose:compose-foundation:1.4.1")
+    implementation("androidx.wear.compose:compose-navigation:1.4.1")
     implementation("androidx.wear:wear:1.3.0")
 
     // 邮件协议（JavaMail Android 版：IMAP over SSL / SMTP，MIME 解码由库完成）
