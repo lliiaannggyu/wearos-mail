@@ -32,6 +32,7 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.SwipeDismissableNavHostState
+import androidx.wear.compose.navigation.composable as wearComposable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavHostState
 import com.tengwear.tengemail.DeviceSupport
@@ -94,7 +95,7 @@ fun WearMailApp(ambient: Boolean, vm: MailViewModel, onExit: () -> Unit) {
                     startDestination = startDestination,
                     state = navHostState,
                 ) {
-                    MailNavGraph(vm, nav, swipeState)
+                    MailNavGraph(vm, nav, swipeState, useWearNavigator = true)
                 }
             } else {
                 val nav: NavHostController = rememberNavController()
@@ -103,7 +104,7 @@ fun WearMailApp(ambient: Boolean, vm: MailViewModel, onExit: () -> Unit) {
                     navController = nav,
                     startDestination = startDestination,
                 ) {
-                    MailNavGraph(vm, nav, null)
+                    MailNavGraph(vm, nav, null, useWearNavigator = false)
                 }
             }
         }
@@ -122,22 +123,37 @@ private fun AccountWatcher(account: MailAccount?, nav: NavHostController) {
     }
 }
 
-/** 两种导航容器共用的路由表，保证手表与手机行为一致。 */
+/** 两种导航容器共用的路由表内容：保证手表与手机页面行为一致。 */
 private fun NavGraphBuilder.MailNavGraph(
     vm: MailViewModel,
     nav: NavHostController,
     swipeState: SwipeToDismissBoxState?,
+    useWearNavigator: Boolean,
 ) {
-    composable("login") { LoginScreen(vm, nav) }
-    composable("inbox") { InboxScreen(vm, nav, swipeState) }
-    composable("detail/{uid}") { entry ->
-        val uid = entry.arguments?.getString("uid")?.toLongOrNull() ?: 0L
-        DetailScreen(vm, nav, uid)
+    if (useWearNavigator) {
+        // SwipeDismissableNavHost 必须配套 androidx.wear.compose.navigation 的 composable：
+        // 它把 destination 注册到 WearNavigator。误用 navigation-compose 的 composable 时
+        // WearNavigator 返回栈为空，官方行为是仅打 warning 并显示空白屏（黑屏无内容）。
+        wearComposable("login") { LoginScreen(vm, nav) }
+        wearComposable("inbox") { InboxScreen(vm, nav, swipeState) }
+        wearComposable("detail/{uid}") { entry ->
+            val uid = entry.arguments?.getString("uid")?.toLongOrNull() ?: 0L
+            DetailScreen(vm, nav, uid)
+        }
+        wearComposable("compose") { ComposeScreen(vm, nav) }
+        wearComposable("search") { SearchScreen(vm, nav) }
+        wearComposable("settings") { SettingsScreen(vm, nav) }
+    } else {
+        composable("login") { LoginScreen(vm, nav) }
+        composable("inbox") { InboxScreen(vm, nav, swipeState) }
+        composable("detail/{uid}") { entry ->
+            val uid = entry.arguments?.getString("uid")?.toLongOrNull() ?: 0L
+            DetailScreen(vm, nav, uid)
+        }
+        composable("compose") { ComposeScreen(vm, nav) }
+        composable("search") { SearchScreen(vm, nav) }
+        composable("settings") { SettingsScreen(vm, nav) }
     }
-    composable("compose") { ComposeScreen(vm, nav) }
-    composable("search") { SearchScreen(vm, nav) }
-    // 关于 / 应用内更新 / 账号切换 / 自定义种子色统一收口到设置页
-    composable("settings") { SettingsScreen(vm, nav) }
 }
 
 /**

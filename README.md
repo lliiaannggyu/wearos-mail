@@ -104,6 +104,18 @@ app/src/main/kotlin/com/tengwear/tengemail/
 > 注意：包名变了，v1.3.0 与旧版（`com.workbuddy.wearosmail`）在 Android 上是**两个不同应用**，
 > 无法覆盖安装；需先卸载旧包，旧包里的账号也不会自动迁移到新包。
 
+## v1.3.3：修复同意协议后黑屏
+
+> 真机现象：同意使用协议后整屏黑色、无任何内容、不崩溃。
+> 根因：`SwipeDismissableNavHost` 的路由表误用了 `androidx.navigation.compose` 的
+> `composable`，destination 被注册到 `ComposableNavigator`；而 `SwipeDismissableNavHost`
+> 只认 `WearNavigator` 的 destination，返回栈为空时官方行为是仅打 warning 并显示空白屏
+> （Google Issue Tracker #277700155）。`reduce_motion` 崩溃修复后该 bug 才首次暴露。
+
+| 修复 | 说明 |
+| --- | --- |
+| 路由表分双容器注册 | `MailNavGraph(useWearNavigator)`：手表 `SwipeDismissableNavHost` 用 `androidx.wear.compose.navigation.composable`（alias `wearComposable`）注册到 WearNavigator；手机标准 `NavHost` 继续用 navigation-compose 的 `composable`，页面内容两容器共用 |
+
 ## v1.3.2：修复 Wear OS 5 启动崩溃
 
 > 真机崩溃报告（Samsung SM-R920 / Android 14 / targetSdk 35）：`SwipeDismissableNavHost`

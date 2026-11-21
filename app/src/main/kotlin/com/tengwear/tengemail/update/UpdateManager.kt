@@ -26,7 +26,7 @@ import java.net.URL
  */
 class UpdateManager(private val context: Context) {
     companion object {
-        const val CURRENT_VERSION = "1.3.2"
+        const val CURRENT_VERSION = "1.3.3"
         private const val REPO_API =
             "https://api.github.com/repos/lliiaannggyu/wearos-mail/releases/latest"
         private const val MANIFEST =

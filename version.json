@@ -1,6 +1,6 @@
 {
-  "version": "1.3.2",
-  "apk": "https://github.com/lliiaannggyu/wearos-mail/releases/download/v1.3.2/wearos-mail-v1.3.2.apk",
-  "size": 1652324,
-  "note": "v1.3.2 修复 Wear OS 5（Android 14 / targetSdk 35）启动崩溃：Wear Compose 升 1.4.1 修复 LocalReduceMotion 读取 reduce_motion 抛 SecurityException；targetSdk 降为 34（Google 官方对 Wear OS 5 的推荐值）。size 发版时回填为 APK 实际字节数。GitHub API 限流时应用会回退读取本文件。发版时必须与 app/build.gradle.kts 的 versionName 同步。"
+  "version": "1.3.3",
+  "apk": "https://github.com/lliiaannggyu/wearos-mail/releases/download/v1.3.3/wearos-mail-v1.3.3.apk",
+  "size": 1652320,
+  "note": "v1.3.3 修复同意协议后黑屏：SwipeDismissableNavHost 路由表误用 navigation-compose 的 composable，WearNavigator 返回栈为空导致空白屏；改用 wear.compose.navigation 的 composable 注册 destination。size 发版时回填为 APK 实际字节数。GitHub API 限流时应用会回退读取本文件。发版时必须与 app/build.gradle.kts 的 versionName 同步。"
 }

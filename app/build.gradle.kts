@@ -24,8 +24,8 @@ android {
         // targetSdk 35 时读取 Settings.Global.reduce_motion 会抛 SecurityException，
         // 导致 Wear Compose 的 LocalReduceMotion 在组合首页时崩溃。
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.3.2"
+        versionCode = 8
+        versionName = "1.3.3"
     }
 
     signingConfigs {
